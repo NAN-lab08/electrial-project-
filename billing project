@@ -1,0 +1,67 @@
+from flask import Flask, render_template, request, jsonify
+import matplotlib.pyplot as plt
+import os
+import json
+
+app = Flask(__name__)
+
+# Data storage for appliances (In-memory for simplicity)
+appliances = []
+rate_per_unit = 5  # Rate per unit in ₹
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/add_appliance', methods=['POST'])
+def add_appliance():
+    data = request.json
+    appliances.append({
+        'name': data['name'],
+        'power': data['power'],
+        'hours': data['hours']
+    })
+    return jsonify({'message': 'Appliance added successfully'})
+
+@app.route('/calculate', methods=['GET'])
+def calculate():
+    total_energy = 0
+    total_cost = 0
+    results = []
+
+    for appliance in appliances:
+        energy = (appliance['power'] / 1000) * appliance['hours'] * 30  # kWh per month
+        cost = energy * rate_per_unit
+        total_energy += energy
+        total_cost += cost
+
+        results.append({
+            'name': appliance['name'],
+            'energy': energy,
+            'cost': cost
+        })
+
+    return jsonify({'results': results, 'total_energy': total_energy, 'total_cost': total_cost})
+
+@app.route('/visualize', methods=['GET'])
+def visualize():
+    names = [a['name'] for a in appliances]
+    energies = [(a['power'] / 1000) * a['hours'] * 30 for a in appliances]
+    costs = [energy * rate_per_unit for energy in energies]
+
+    # Create the chart
+    plt.figure(figsize=(10, 6))
+    plt.bar(names, energies, color='skyblue', label='Energy (kWh)')
+    plt.bar(names, costs, color='orange', label='Cost (₹)', bottom=energies)
+    plt.xlabel('Appliance')
+    plt.ylabel('Value')
+    plt.legend()
+    plt.title('Energy and Cost Distribution')
+    chart_path = os.path.join('static', 'chart.png')
+    plt.savefig(chart_path)
+    plt.close()
+
+    return jsonify({'chart_url': chart_path})
+
+if __name__ == '__main__':
+    app.run(debug=True)
